@@ -28,5 +28,9 @@
     "prettier": "^3.6.2",
     "typescript": "^5.8.3",
     "wrangler": "^4.85.0"
+  },
+  "dependencies": {
+    "drizzle-kit": "^0.31.10",
+    "drizzle-orm": "^0.45.2"
   }
 }

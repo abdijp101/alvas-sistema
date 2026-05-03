@@ -1,27 +1,18 @@
 import { type UsuarioRespuestaDTO } from "../../application";
 import { Usuario } from "../../domain/entities";
-
-export type UsuarioPersistenciaRow = {
-  id: string;
-  nombre?: string;
-  hash_clave: string;
-  rol: string;
-  estado: string;
-  creado_en?: string;
-  actualizado_en?: string;
-};
+import { type UsuarioRow } from "./schema";
 
 export class UsuarioMapper {
-  static aDominio(row: UsuarioPersistenciaRow): Usuario {
+  static aDominio(row: UsuarioRow): Usuario {
     const nombre = row.nombre && row.nombre.trim() ? row.nombre : row.id;
     const ahora = new Date().toISOString();
-    const creadoEn = row.creado_en || ahora;
-    const actualizadoEn = row.actualizado_en || ahora;
+    const creadoEn = row.creadoEn || ahora;
+    const actualizadoEn = row.actualizadoEn || ahora;
 
     return Usuario.reconstituir({
       id: row.id,
       nombre,
-      hashClave: row.hash_clave,
+      hashClave: row.hashClave,
       rol: row.rol,
       estado: row.estado,
       creadoEn,
@@ -29,15 +20,15 @@ export class UsuarioMapper {
     });
   }
 
-  static aPersistencia(usuario: Usuario): UsuarioPersistenciaRow {
+  static aPersistencia(usuario: Usuario) {
     return {
       id: usuario.id.valor,
       nombre: usuario.nombre.valor,
-      hash_clave: usuario.hashClave,
+      hashClave: usuario.hashClave,
       rol: usuario.rol.valor,
       estado: usuario.estado.valor,
-      creado_en: usuario.creadoEn.toISOString(),
-      actualizado_en: usuario.actualizadoEn.toISOString(),
+      creadoEn: usuario.creadoEn.toISOString(),
+      actualizadoEn: usuario.actualizadoEn.toISOString(),
     };
   }
 

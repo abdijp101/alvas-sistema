@@ -1,130 +1,173 @@
+import { eq } from "drizzle-orm";
 import { type D1DatabaseLike } from "../../../shared/infrastructure";
 import { Usuario } from "../../domain/entities";
 import { type IUsuarioRepository } from "../../application/ports";
 import { EstadoUsuario, IdUsuario } from "../../domain/value-objects";
-import { asegurarEsquemaUsuarios } from "./schema";
-import { UsuarioMapper, type UsuarioPersistenciaRow } from "./UsuarioMapper";
+import { obtenerDb } from "./drizzle";
+import { usuariosTable, type UsuarioRow } from "./schema";
+import { UsuarioMapper } from "./UsuarioMapper";
 
 export class D1UsuarioRepository implements IUsuarioRepository {
   constructor(private readonly db: D1DatabaseLike) {}
 
+  private drizzle() {
+    return obtenerDb(this.db);
+  }
+
   async obtenerPorId(id: IdUsuario): Promise<Usuario | null> {
-    await asegurarEsquemaUsuarios(this.db);
+    try {
+      const row = await this.drizzle()
+        .select()
+        .from(usuariosTable)
+        .where(eq(usuariosTable.id, id.valor))
+        .get();
 
-    const row = await this.db
-      .prepare(
-        "SELECT id, nombre, hash_clave, rol, estado, creado_en, actualizado_en FROM usuarios WHERE id = ?1",
-      )
-      .bind(id.valor)
-      .first<UsuarioPersistenciaRow>();
+      if (!row) {
+        return null;
+      }
 
-    if (!row) {
-      return null;
+      return UsuarioMapper.aDominio(row as UsuarioRow);
+    } catch (error) {
+      console.error(`Error obtenerPorId(${id.valor}):`, error);
+      throw error;
     }
-
-    return UsuarioMapper.aDominio(row);
   }
 
   async existePorId(id: IdUsuario): Promise<boolean> {
-    await asegurarEsquemaUsuarios(this.db);
+    try {
+      const row = await this.drizzle()
+        .select({ id: usuariosTable.id })
+        .from(usuariosTable)
+        .where(eq(usuariosTable.id, id.valor))
+        .get();
 
-    const row = await this.db
-      .prepare("SELECT id FROM usuarios WHERE id = ?1")
-      .bind(id.valor)
-      .first<{ id: string }>();
-
-    return !!row;
+      return !!row;
+    } catch (error) {
+      console.error(`Error existePorId(${id.valor}):`, error);
+      throw error;
+    }
   }
 
   async guardar(usuario: Usuario): Promise<void> {
-    await asegurarEsquemaUsuarios(this.db);
-    const usuarioPersistencia = UsuarioMapper.aPersistencia(usuario);
+    try {
+      const ahora = new Date().toISOString();
+      const usuarioPersistencia = UsuarioMapper.aPersistencia(usuario);
 
-    await this.db
-      .prepare(
-        `
-          INSERT INTO usuarios (id, nombre, hash_clave, rol, estado, creado_en, actualizado_en)
-          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
-          ON CONFLICT(id) DO UPDATE SET
-            nombre = excluded.nombre,
-            hash_clave = excluded.hash_clave,
-            rol = excluded.rol,
-            estado = excluded.estado,
-            actualizado_en = excluded.actualizado_en
-        `,
-      )
-      .bind(
-        usuarioPersistencia.id,
-        usuarioPersistencia.nombre,
-        usuarioPersistencia.hash_clave,
-        usuarioPersistencia.rol,
-        usuarioPersistencia.estado,
-        usuarioPersistencia.creado_en,
-        usuarioPersistencia.actualizado_en,
-      )
-      .run();
+      await this.drizzle()
+        .insert(usuariosTable)
+        .values({
+          id: usuarioPersistencia.id,
+          nombre: usuarioPersistencia.nombre,
+          hashClave: usuarioPersistencia.hashClave,
+          rol: usuarioPersistencia.rol,
+          estado: usuarioPersistencia.estado,
+          creadoEn: usuarioPersistencia.creadoEn,
+          actualizadoEn: ahora,
+        })
+        .onConflictDoUpdate({
+          target: usuariosTable.id,
+          set: {
+            nombre: usuarioPersistencia.nombre,
+            hashClave: usuarioPersistencia.hashClave,
+            rol: usuarioPersistencia.rol,
+            estado: usuarioPersistencia.estado,
+            actualizadoEn: ahora,
+          },
+        });
+    } catch (error) {
+      console.error(`Error guardar usuario(${usuario.id.valor}):`, error);
+      throw error;
+    }
   }
 
   async eliminarPorId(id: IdUsuario): Promise<void> {
-    await asegurarEsquemaUsuarios(this.db);
-    await this.db.prepare("DELETE FROM usuarios WHERE id = ?1").bind(id.valor).run();
+    try {
+      await this.drizzle()
+        .delete(usuariosTable)
+        .where(eq(usuariosTable.id, id.valor));
+    } catch (error) {
+      console.error(`Error eliminarPorId(${id.valor}):`, error);
+      throw error;
+    }
   }
 
   async listarTodos(): Promise<Usuario[]> {
-    await asegurarEsquemaUsuarios(this.db);
+    try {
+      const rows = await this.drizzle()
+        .select()
+        .from(usuariosTable)
+        .orderBy(usuariosTable.id);
 
-    const query = await this.db
-      .prepare(
-        "SELECT id, nombre, hash_clave, rol, estado, creado_en, actualizado_en FROM usuarios ORDER BY id ASC",
-      )
-      .all<UsuarioPersistenciaRow>();
-
-    return query.results.map((row: UsuarioPersistenciaRow) => UsuarioMapper.aDominio(row));
+      return rows.map((row) => UsuarioMapper.aDominio(row as UsuarioRow));
+    } catch (error) {
+      console.error("Error listarTodos:", error);
+      throw error;
+    }
   }
 
   async deshabilitarPorId(id: IdUsuario): Promise<void> {
-    const usuario = await this.obtenerPorId(id);
+    try {
+      const usuario = await this.obtenerPorId(id);
 
-    if (!usuario) {
-      return;
+      if (!usuario) {
+        return;
+      }
+
+      usuario.deshabilitar();
+      await this.guardar(usuario);
+    } catch (error) {
+      console.error(`Error deshabilitarPorId(${id.valor}):`, error);
+      throw error;
     }
-
-    usuario.deshabilitar();
-    await this.guardar(usuario);
   }
 
   async actualizarRol(id: IdUsuario, nuevoRol: string): Promise<void> {
-    const usuario = await this.obtenerPorId(id);
+    try {
+      const usuario = await this.obtenerPorId(id);
 
-    if (!usuario) {
-      return;
+      if (!usuario) {
+        return;
+      }
+
+      usuario.cambiarRol(nuevoRol);
+      await this.guardar(usuario);
+    } catch (error) {
+      console.error(`Error actualizarRol(${id.valor}):`, error);
+      throw error;
     }
-
-    usuario.cambiarRol(nuevoRol);
-    await this.guardar(usuario);
   }
 
   async actualizarHashClave(id: IdUsuario, nuevoHash: string): Promise<void> {
-    const usuario = await this.obtenerPorId(id);
+    try {
+      const usuario = await this.obtenerPorId(id);
 
-    if (!usuario) {
-      return;
+      if (!usuario) {
+        return;
+      }
+
+      usuario.cambiarHashClave(nuevoHash);
+      await this.guardar(usuario);
+    } catch (error) {
+      console.error(`Error actualizarHashClave(${id.valor}):`, error);
+      throw error;
     }
-
-    usuario.cambiarHashClave(nuevoHash);
-    await this.guardar(usuario);
   }
 
   async crearUsuario(id: string, nombre: string, hashClave: string, rol: string): Promise<Usuario> {
-    const usuario = Usuario.crear({
-      id,
-      nombre,
-      hashClave,
-      rol,
-      estado: EstadoUsuario.activo().valor,
-    });
+    try {
+      const usuario = Usuario.crear({
+        id,
+        nombre,
+        hashClave,
+        rol,
+        estado: EstadoUsuario.activo().valor,
+      });
 
-    await this.guardar(usuario);
-    return usuario;
+      await this.guardar(usuario);
+      return usuario;
+    } catch (error) {
+      console.error(`Error crearUsuario(${id}):`, error);
+      throw error;
+    }
   }
 }
