@@ -6,12 +6,12 @@ module.exports = [
   {
     ignores: [
       "eslint.config.js",
-      "node_modules/**",
-      "dist/**",
-      "out/**",
-      "coverage/**",
-      ".wrangler/**",
-      ".cache/**",
+      "**/node_modules/**",
+      "**/dist/**",
+      "**/out/**",
+      "**/coverage/**",
+      "**/.wrangler/**",
+      "**/.cache/**",
       "bun.lock",
     ],
   },
