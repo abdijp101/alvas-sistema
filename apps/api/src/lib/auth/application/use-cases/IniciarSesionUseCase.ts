@@ -34,7 +34,7 @@ export class IniciarSesionUseCase
         return resultadoFallido(new CredencialesInvalidasError());
       }
 
-      const coincideClave = await this.passwordHasher.comparar(clave, usuario.hashClave);
+      const coincideClave = await this.passwordHasher.comparar(clave, usuario.hashClave.valor);
 
       if (!coincideClave) {
         return resultadoFallido(new CredencialesInvalidasError());
