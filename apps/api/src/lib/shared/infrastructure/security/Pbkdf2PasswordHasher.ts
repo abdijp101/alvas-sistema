@@ -1,6 +1,6 @@
 import { ErrorDeValidacion } from "../../../shared/domain";
-import { type IPasswordHasher } from "../../application/ports";
-import { HashClave } from "../../domain/value-objects";
+import { type IPasswordHasher } from "../../../usuarios/application/ports";
+import { HashClave } from "../../../usuarios/domain/value-objects";
 
 const ITERACIONES_PBKDF2 = 120_000;
 const LARGO_HASH_BYTES = 32;

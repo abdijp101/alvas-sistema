@@ -3,6 +3,7 @@ import { ErrorDeDominio } from "./lib/shared/domain";
 import { type PayloadToken } from "./lib/auth/application";
 import { crearAuthRouter } from "./lib/auth/infrastructure";
 import { crearUsuarioRouter } from "./lib/usuarios/infrastructure";
+import { citaRouter } from "./lib/citas/infrastructure";
 import { type D1DatabaseLike } from "./lib/shared/infrastructure";
 
 type AppBindings = {
@@ -23,6 +24,7 @@ const app = new Hono<{ Bindings: AppBindings; Variables: AppVariables }>();
 app.get("/health", (c) => c.json({ status: "ok", service: "alvas-api" }));
 app.route("/usuarios", crearUsuarioRouter());
 app.route("/auth", crearAuthRouter());
+app.route("/citas", citaRouter);
 
 app.onError((error, c) => {
   if (error instanceof ErrorDeDominio) {

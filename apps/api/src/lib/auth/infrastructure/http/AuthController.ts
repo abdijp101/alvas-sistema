@@ -1,14 +1,13 @@
 import { type Context } from "hono";
-import { type PayloadToken } from "../../application";
-import { ErrorDeDominio } from "../../../shared/domain";
 import { type D1DatabaseLike } from "../../../shared/infrastructure";
-import { D1UsuarioRepository } from "../../../usuarios/infrastructure";
-import { IniciarSesionUseCase, RenovarSesionUseCase } from "../../application";
-import { AuthTokenInvalidoError, CredencialesInvalidasError } from "../../domain";
-import { crearTokenProviderDesdeEnv } from "../security/TokenProviderFactory";
-import { Pbkdf2PasswordHasher } from "../../../usuarios/infrastructure";
+import { Pbkdf2PasswordHasher } from "../../../shared/infrastructure/security/Pbkdf2PasswordHasher";
+import { IniciarSesionUseCase } from "../../application/use-cases/IniciarSesionUseCase";
+import { RenovarSesionUseCase } from "../../application/use-cases/RenovarSesionUseCase";
+import { D1UsuarioRepository } from "../../../usuarios/infrastructure/persistence/D1UsuarioRepository";
+import { HmacTokenProvider } from "../security/HmacTokenProvider";
+import { type IniciarSesionInput } from "../../application/use-cases/IniciarSesionUseCase";
 
-export type AuthBindings = {
+export type BindingsAuth = {
   DB: D1DatabaseLike;
   AUTH_SECRET: string;
   AUTH_REFRESH_SECRET?: string;
@@ -17,59 +16,89 @@ export type AuthBindings = {
   AUTH_PEPPER?: string;
 };
 
-export type AuthVariables = {
-  authPayload: PayloadToken;
-};
-
-type ContextoAuth = Context<{ Bindings: AuthBindings; Variables: AuthVariables }>;
+type ContextoAuth = Context<{ Bindings: BindingsAuth }>;
 
 export class AuthController {
-  async login(c: ContextoAuth): Promise<Response> {
-    const body = await c.req.json<{ idUsuario: string; clave: string }>();
-    const usuarioRepository = new D1UsuarioRepository(c.env.DB);
-    const passwordHasher = new Pbkdf2PasswordHasher(c.env.AUTH_PEPPER);
-    const tokenProvider = crearTokenProviderDesdeEnv(c.env);
-    const useCase = new IniciarSesionUseCase(usuarioRepository, passwordHasher, tokenProvider);
-    const sesion = await useCase.ejecutar({
-      idUsuario: body.idUsuario,
-      clave: body.clave,
-    });
+  async iniciarSesion(c: ContextoAuth): Promise<Response> {
+    try {
+      const body = await c.req.json<IniciarSesionInput>();
+      const repo = new D1UsuarioRepository(c.env.DB);
+      const passwordHasher = new Pbkdf2PasswordHasher(c.env.AUTH_PEPPER);
+      const tokenProvider = new HmacTokenProvider({
+        authSecret: c.env.AUTH_SECRET,
+        refreshSecret: c.env.AUTH_REFRESH_SECRET,
+        authTokenTtlSegundos: c.env.AUTH_TOKEN_TTL_SEGUNDOS ? parseInt(c.env.AUTH_TOKEN_TTL_SEGUNDOS) : 900,
+        refreshTokenTtlSegundos: c.env.REFRESH_TOKEN_TTL_SEGUNDOS ? parseInt(c.env.REFRESH_TOKEN_TTL_SEGUNDOS) : 604800,
+      });
 
-    if (!sesion.esExito) {
-      return this.responderErrorDeDominio(sesion.error, c);
+      const useCase = new IniciarSesionUseCase(repo, passwordHasher, tokenProvider);
+      const resultado = await useCase.ejecutar(body);
+
+      if (!resultado.esExito) {
+        return c.json(
+          {
+            success: false,
+            message: resultado.error.message,
+            code: resultado.error.codigo,
+          },
+          401,
+        );
+      }
+
+      return c.json({
+        success: true,
+        data: resultado.valor,
+      });
+    } catch (error) {
+      console.error("Error inesperado en AuthController.iniciarSesion:", error);
+      return c.json(
+        {
+          success: false,
+          message: "Error interno del servidor",
+        },
+        500,
+      );
     }
-
-    return c.json({ success: true, data: sesion.valor }, 200);
   }
 
-  async refresh(c: ContextoAuth): Promise<Response> {
-    const body = await c.req.json<{ refreshToken: string }>();
-    const usuarioRepository = new D1UsuarioRepository(c.env.DB);
-    const tokenProvider = crearTokenProviderDesdeEnv(c.env);
-    const useCase = new RenovarSesionUseCase(usuarioRepository, tokenProvider);
-    const sesion = await useCase.ejecutar({
-      refreshToken: body.refreshToken,
-    });
+  async renovarSesion(c: ContextoAuth): Promise<Response> {
+    try {
+      const { refreshToken } = await c.req.json<{ refreshToken: string }>();
+      const repo = new D1UsuarioRepository(c.env.DB);
+      const tokenProvider = new HmacTokenProvider({
+        authSecret: c.env.AUTH_SECRET,
+        refreshSecret: c.env.AUTH_REFRESH_SECRET,
+        authTokenTtlSegundos: c.env.AUTH_TOKEN_TTL_SEGUNDOS ? parseInt(c.env.AUTH_TOKEN_TTL_SEGUNDOS) : 900,
+        refreshTokenTtlSegundos: c.env.REFRESH_TOKEN_TTL_SEGUNDOS ? parseInt(c.env.REFRESH_TOKEN_TTL_SEGUNDOS) : 604800,
+      });
 
-    if (!sesion.esExito) {
-      return this.responderErrorDeDominio(sesion.error, c);
+      const useCase = new RenovarSesionUseCase(repo, tokenProvider);
+      const resultado = await useCase.ejecutar({ refreshToken });
+
+      if (!resultado.esExito) {
+        return c.json(
+          {
+            success: false,
+            message: resultado.error.message,
+            code: resultado.error.codigo,
+          },
+          401,
+        );
+      }
+
+      return c.json({
+        success: true,
+        data: resultado.valor,
+      });
+    } catch (error) {
+      console.error("Error inesperado en AuthController.renovarSesion:", error);
+      return c.json(
+        {
+          success: false,
+          message: "Error interno del servidor",
+        },
+        500,
+      );
     }
-
-    return c.json({ success: true, data: sesion.valor }, 200);
-  }
-
-  async me(c: ContextoAuth): Promise<Response> {
-    return c.json({
-      success: true,
-      data: c.get("authPayload"),
-    });
-  }
-
-  private responderErrorDeDominio(error: ErrorDeDominio, c: ContextoAuth): Response {
-    if (error instanceof CredencialesInvalidasError || error instanceof AuthTokenInvalidoError) {
-      return c.json({ success: false, message: error.message, code: error.codigo }, 401);
-    }
-
-    return c.json({ success: false, message: error.message, code: error.codigo }, 400);
   }
 }
