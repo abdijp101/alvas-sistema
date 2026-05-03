@@ -3,24 +3,29 @@ import { Usuario } from "../../domain/entities";
 
 export type UsuarioPersistenciaRow = {
   id: string;
-  nombre: string;
+  nombre?: string;
   hash_clave: string;
   rol: string;
   estado: string;
-  creado_en: string;
-  actualizado_en: string;
+  creado_en?: string;
+  actualizado_en?: string;
 };
 
 export class UsuarioMapper {
   static aDominio(row: UsuarioPersistenciaRow): Usuario {
+    const nombre = row.nombre && row.nombre.trim() ? row.nombre : row.id;
+    const ahora = new Date().toISOString();
+    const creadoEn = row.creado_en || ahora;
+    const actualizadoEn = row.actualizado_en || ahora;
+
     return Usuario.reconstituir({
       id: row.id,
-      nombre: row.nombre,
+      nombre,
       hashClave: row.hash_clave,
       rol: row.rol,
       estado: row.estado,
-      creadoEn: row.creado_en,
-      actualizadoEn: row.actualizado_en,
+      creadoEn,
+      actualizadoEn,
     });
   }
 
