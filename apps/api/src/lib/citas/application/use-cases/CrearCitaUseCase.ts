@@ -2,18 +2,36 @@ import { type CasoDeUso, resultadoExitoso, resultadoFallido, type Resultado } fr
 import { ErrorDeDominio, ErrorDeValidacion } from "../../../shared/domain";
 import { type ICitaRepository } from "../../domain/ports";
 import { Cita } from "../../domain/entities";
-import { IdUsuario } from "../../../usuarios/domain/value-objects";
+import { IdUsuario, type ValorRolUsuario } from "../../../usuarios/domain/value-objects";
 import { type CrearCitaDTO } from "../dto/CitaDTOs";
 import { type IGeneradorId } from "../../../shared/domain/ports/IGeneradorId";
 
-export class CrearCitaUseCase implements CasoDeUso<CrearCitaDTO, Resultado<Cita, ErrorDeDominio>> {
+export type CrearCitaInput = {
+  dto: CrearCitaDTO;
+  usuarioAutenticado: {
+    id: string;
+    rol: ValorRolUsuario;
+  };
+};
+
+export class CrearCitaUseCase implements CasoDeUso<CrearCitaInput, Resultado<Cita, ErrorDeDominio>> {
   constructor(
     private readonly citaRepository: ICitaRepository,
     private readonly generadorId: IGeneradorId
   ) {}
 
-  async ejecutar(dto: CrearCitaDTO): Promise<Resultado<Cita, ErrorDeDominio>> {
+  async ejecutar(input: CrearCitaInput): Promise<Resultado<Cita, ErrorDeDominio>> {
     try {
+      const { dto, usuarioAutenticado } = input;
+
+      // Regla de Negocio: Un asesor solo puede crear citas para sí mismo.
+      // El administrador puede crear citas para cualquier asesor.
+      if (usuarioAutenticado.rol !== "ADMIN" && usuarioAutenticado.id !== dto.idUsuario) {
+        throw new ErrorDeDominio("No tienes permisos para crear una cita para otro usuario.", {
+          codigo: "SIN_PERMISOS",
+        });
+      }
+
       const fechaInicio = new Date(dto.fechaInicio);
       if (isNaN(fechaInicio.getTime())) {
         throw new ErrorDeValidacion("La fecha de inicio no es válida.");

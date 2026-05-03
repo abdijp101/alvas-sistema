@@ -83,6 +83,16 @@ export class D1CitaRepository implements ICitaRepository {
     return rows.map((row) => CitaMapper.aDominio(row as CitaRow));
   }
 
+  async obtenerPorUsuario(idUsuario: IdUsuario): Promise<Cita[]> {
+    const rows = await this.drizzle()
+      .select()
+      .from(citasTable)
+      .where(eq(citasTable.idUsuario, idUsuario.valor))
+      .orderBy(citasTable.fechaInicio);
+
+    return rows.map((row) => CitaMapper.aDominio(row as CitaRow));
+  }
+
   async obtenerPorLead(idLead: string): Promise<Cita[]> {
     const rows = await this.drizzle()
       .select()
