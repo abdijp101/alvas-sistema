@@ -1,29 +1,29 @@
 {
   "compilerOptions": {
-    // Environment setup & latest features
-    "lib": ["ESNext"],
+    "lib": ["ESNext", "DOM"],
     "target": "ESNext",
     "module": "Preserve",
     "moduleDetection": "force",
-    "jsx": "react-jsx",
-    "allowJs": true,
-
-    // Bundler mode
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
+    "resolveJsonModule": true,
     "noEmit": true,
-
-    // Best practices
     "strict": true,
     "skipLibCheck": true,
     "noFallthroughCasesInSwitch": true,
     "noUncheckedIndexedAccess": true,
     "noImplicitOverride": true,
-
-    // Some stricter flags (disabled by default)
-    "noUnusedLocals": false,
-    "noUnusedParameters": false,
-    "noPropertyAccessFromIndexSignature": false
-  }
+    "baseUrl": ".",
+    "paths": {
+      "@alvas/api/*": ["apps/api/src/*"],
+      "@alvas/web/*": ["apps/web/src/*"],
+      "@alvas/shared-types": ["packages/shared-types/src/index.ts"],
+      "@alvas/shared-types/*": ["packages/shared-types/src/*"],
+      "@alvas/shared-utils": ["packages/shared-utils/src/index.ts"],
+      "@alvas/shared-utils/*": ["packages/shared-utils/src/*"]
+    }
+  },
+  "include": ["*.ts"],
+  "exclude": ["node_modules", "dist", "out", ".wrangler", "coverage"]
 }

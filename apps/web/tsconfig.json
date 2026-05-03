@@ -1,7 +1,6 @@
 {
   "extends": "../../tsconfig.json",
   "compilerOptions": {
-    "lib": ["ESNext", "DOM", "WebWorker"],
     "types": ["bun-types"]
   },
   "include": ["src/**/*.ts"]

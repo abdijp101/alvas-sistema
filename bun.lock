@@ -6,6 +6,7 @@
       "name": "alvas-sistema",
       "devDependencies": {
         "bun-types": "latest",
+        "typescript": "^5.8.3",
         "wrangler": "^4.85.0",
       },
     },
