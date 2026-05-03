@@ -6,3 +6,10 @@ compatibility_date = "2024-04-25"
 binding = "DB"
 database_name = "alvas_db"
 database_id = "tu-id-de-d1-aqui" # Se genera al crear la DB en Cloudflare
+
+[vars]
+AUTH_SECRET = "cambiar-esto-en-cloudflare"
+AUTH_REFRESH_SECRET = "cambiar-refresh-secret"
+AUTH_TOKEN_TTL_SEGUNDOS = "900"
+REFRESH_TOKEN_TTL_SEGUNDOS = "604800"
+AUTH_PEPPER = "cambiar-pepper"
